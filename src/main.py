@@ -167,7 +167,8 @@ def data_summary(data: pd.DataFrame) -> None:
 
 
 def data_preprocessing(data: pd.DataFrame):
-    pass
+    data = data.dropna()
+    return data
 
 
 def correlation_matrix(data: pd.DataFrame):
