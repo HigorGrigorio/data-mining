@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+CORRELATION_MATRIX_SIZE = 20
 
 def index_job(job: str) -> int:
     jobs = {
@@ -172,6 +175,14 @@ def correlation_matrix(data: pd.DataFrame):
     print(f"Correlation matrix:\n{corr_matrix}")
     return corr_matrix
 
+def plot_correlation_matrix(corr_matrix: pd.DataFrame):
+    """
+    Plot correlation matrix with heatmap
+    """
+    plt.figure(figsize=(CORRELATION_MATRIX_SIZE, CORRELATION_MATRIX_SIZE))
+    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+    plt.title("Correlation Matrix Heatmap")
+    plt.show()
 
 def main():
     # data load
@@ -197,14 +208,16 @@ def main():
         "nr.employed",
         "y",
     ]
+    data_path = __file__.replace("main.py", "data/bank-additional/bank-additional/bank-additional-full.csv")
     data = load_data(
-        "./src/data/bank-additional/bank-additional/bank-additional-full.csv",
+        data_path,
         usecols=cols,
     )
     data_summary(data)
 
-    correlation_matrix(data)
+    mrx = correlation_matrix(data)
 
+    plot_correlation_matrix(mrx)
 
 if __name__ == "__main__":
     main()
