@@ -4,6 +4,26 @@
 
 
 class Mapper:
+    """
+    A class that provides mapping functions for various attributes.
+
+    Attributes:
+        None
+
+    Methods:
+        index_job(job: str) -> int: Maps the job attribute to an integer value.
+        marital_status(status: str) -> int: Maps the marital status attribute to an integer value.
+        education_level(level: str) -> int: Maps the education level attribute to an integer value.
+        default_status(status: str) -> int: Maps the default status attribute to an integer value.
+        housing_loan(status: str) -> int: Maps the housing loan attribute to an integer value.
+        loan_status(status: str) -> int: Maps the loan status attribute to an integer value.
+        month_index(month: str) -> int: Maps the month attribute to an integer value.
+        day_of_week_index(day: str) -> int: Maps the day of the week attribute to an integer value.
+        poutcome_status(status: str) -> int: Maps the poutcome status attribute to an integer value.
+        contact_type(contact: str) -> int: Maps the contact type attribute to an integer value.
+        result_status(status: str) -> int: Maps the result status attribute to an integer value.
+    """
+
     def index_job(job: str) -> int:
         jobs = {
             "admin.": 0,
@@ -17,7 +37,6 @@ class Mapper:
             "student": 8,
             "technician": 9,
             "unemployed": 10,
-            "unknown": 11,
         }
         return jobs[job]
 
@@ -26,7 +45,6 @@ class Mapper:
             "divorced": 0,
             "married": 1,
             "single": 2,
-            "unknown": 3,
         }
         return statuses[status]
 
@@ -39,7 +57,6 @@ class Mapper:
             "illiterate": 4,
             "professional.course": 5,
             "university.degree": 6,
-            "unknown": 7,
         }
 
         return ed_level[level]
@@ -48,7 +65,6 @@ class Mapper:
         statuses = {
             "no": 0,
             "yes": 1,
-            "unknown": 2,
         }
         return statuses[status]
 
@@ -56,7 +72,6 @@ class Mapper:
         statuses = {
             "no": 0,
             "yes": 1,
-            "unknown": 2,
         }
         return statuses[status]
 
@@ -64,7 +79,6 @@ class Mapper:
         statuses = {
             "no": 0,
             "yes": 1,
-            "unknown": 2,
         }
         return statuses[status]
 

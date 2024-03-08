@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from src.mappers import Mapper
+from mappers import Mapper
 
 CORRELATION_MATRIX_SIZE = 20
 
@@ -27,7 +27,9 @@ def load_data(
             "y": lambda x: Mapper.result_status(x),
             "job": lambda x: Mapper.index_job(x) if x != na_values else np.nan,
             "marital": lambda x: Mapper.marital_status(x) if x != na_values else np.nan,
-            "education": lambda x: Mapper.education_level(x) if x != na_values else np.nan,
+            "education": lambda x: (
+                Mapper.education_level(x) if x != na_values else np.nan
+            ),
             "default": lambda x: Mapper.default_status(x) if x != na_values else np.nan,
             "housing": lambda x: Mapper.housing_loan(x) if x != na_values else np.nan,
             "loan": lambda x: Mapper.loan_status(x) if x != na_values else np.nan,
