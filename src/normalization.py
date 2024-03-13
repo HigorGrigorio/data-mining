@@ -1,8 +1,9 @@
 # -----------------------------------------------------------------------------
-# (C) 2023 Higor Grigorio (higorgrigorio@gmail.com)  (MIT License)
+# (C) 2024 Higor Grigorio (higorgrigorio@gmail.com)  (MIT License)
 # -----------------------------------------------------------------------------
 
 import numpy as np
+import sklearn.preprocessing as skp
 
 
 def _normalize_min_max(data: np.array) -> np.array:
@@ -35,6 +36,21 @@ def _normalize_z_score(data: np.array) -> np.array:
     return (data - data.mean()) / data.std()
 
 
+def _sklearn_normalization(data: np.array, strategy) -> np.array:
+    """
+    Normalize data using min-max method from sklearn
+
+    Args:
+        data: np.array
+            The data to be normalized
+
+    Returns:
+        np.array
+            The normalized data
+    """
+    return strategy.fit_transform(data)
+
+
 def normalize(data, method='min-max'):
     """
     Normalize data using the specified method
@@ -54,12 +70,15 @@ def normalize(data, method='min-max'):
         return _normalize_min_max(data)
     elif method == 'z-score':
         return _normalize_z_score(data)
+    elif method == 'sklearn-min-max':
+        return _sklearn_normalization(data, skp.MinMaxScaler())
+    elif method == 'sklearn-z-score':
+        return _sklearn_normalization(data, skp.StandardScaler())
     else:
         raise ValueError('Invalid method')
 
 
-_min = 5
-_max = 10
+__all__ = ['normalize']
 
-#print(f'Min-Max: {normalize(np.array([10, 5, 60, 55]), "min-max")}')
-#print(f'Z-Score: {normalize(np.array([10, 5, 60, 55]), "z-score")}')
+# print(f'Min-Max: {normalize(np.array([10, 5, 60, 55]), "min-max")}')
+# print(f'Z-Score: {normalize(np.array([10, 5, 60, 55]), "z-score")}')

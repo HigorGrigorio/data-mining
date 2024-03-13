@@ -7,6 +7,7 @@ name = "pypi"
 pandas = "*"
 matplotlib = "*"
 seaborn = "*"
+scikit-learn = "*"
 
 [dev-packages]
 
