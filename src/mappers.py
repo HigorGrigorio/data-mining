@@ -2,131 +2,194 @@
 # (C) 2024 Andre Conde (andre.conde100@gmail.com)  (MIT License)
 # -----------------------------------------------------------------------------
 
-
-class Mapper:
+class BaseMapper:
     """
-    A class that provides mapping functions for various attributes.
-
-    Attributes:
-        None
-
-    Methods:
-        index_job(job: str) -> int: Maps the job attribute to an integer value.
-        marital_status(status: str) -> int: Maps the marital status attribute to an integer value.
-        education_level(level: str) -> int: Maps the education level attribute to an integer value.
-        default_status(status: str) -> int: Maps the default status attribute to an integer value.
-        housing_loan(status: str) -> int: Maps the housing loan attribute to an integer value.
-        loan_status(status: str) -> int: Maps the loan status attribute to an integer value.
-        month_index(month: str) -> int: Maps the month attribute to an integer value.
-        day_of_week_index(day: str) -> int: Maps the day of the week attribute to an integer value.
-        poutcome_status(status: str) -> int: Maps the poutcome status attribute to an integer value.
-        contact_type(contact: str) -> int: Maps the contact type attribute to an integer value.
-        result_status(status: str) -> int: Maps the result status attribute to an integer value.
+    Base class for mappers.
     """
+    __name__ = None
+    __data__ = None
 
-    def index_job(job: str) -> int:
-        jobs = {
-            "admin.": 0,
-            "blue-collar": 1,
-            "entrepreneur": 2,
-            "housemaid": 3,
-            "management": 4,
-            "retired": 5,
-            "self-employed": 6,
-            "services": 7,
-            "student": 8,
-            "technician": 9,
-            "unemployed": 10,
-        }
-        return jobs[job]
+    def __init__(self):
+        pass
 
-    def marital_status(status: str) -> int:
-        statuses = {
-            "divorced": 0,
-            "married": 1,
-            "single": 2,
-        }
-        return statuses[status]
+    @classmethod
+    def map(cls, value):
+        if cls.__data__ is None:
+            raise NotImplementedError("The __data__ attribute must be implemented.")
 
-    def education_level(level: str) -> int:
-        ed_level = {
-            "basic.4y": 0,
-            "basic.6y": 1,
-            "basic.9y": 2,
-            "high.school": 3,
-            "illiterate": 4,
-            "professional.course": 5,
-            "university.degree": 6,
-        }
+        return cls.__data__[value]
 
-        return ed_level[level]
+    @classmethod
+    def revert(cls, value):
+        if cls.__data__ is None:
+            raise NotImplementedError("The __data__ attribute must be implemented.")
 
-    def default_status(status: str) -> int:
-        statuses = {
-            "no": 0,
-            "yes": 1,
-        }
-        return statuses[status]
+        return list(cls.__data__.keys())[list(cls.__data__.values()).index(value)]
 
-    def housing_loan(status: str) -> int:
-        statuses = {
-            "no": 0,
-            "yes": 1,
-        }
-        return statuses[status]
+    @classmethod
+    def map_list(cls, values):
+        return [cls.map(value) for value in values]
 
-    def loan_status(status: str) -> int:
-        statuses = {
-            "no": 0,
-            "yes": 1,
-        }
-        return statuses[status]
+    @classmethod
+    def revert_list(cls, values):
+        return [cls.revert(value) for value in values]
 
-    def month_index(month: str) -> int:
-        months = {
-            "jan": 0,
-            "feb": 1,
-            "mar": 2,
-            "apr": 3,
-            "may": 4,
-            "jun": 5,
-            "jul": 6,
-            "aug": 7,
-            "sep": 8,
-            "oct": 9,
-            "nov": 10,
-            "dec": 11,
-        }
-        return months[month]
+    @staticmethod
+    def get_mapper(name: str):
+        classes = BaseMapper.__subclasses__()
 
-    def day_of_week_index(day: str) -> int:
-        days = {
-            "mon": 0,
-            "tue": 1,
-            "wed": 2,
-            "thu": 3,
-            "fri": 4,
-        }
-        return days[day]
+        for cls in classes:
+            if cls.__name__ == name:
+                return cls
 
-    def poutcome_status(status: str) -> int:
-        statuses = {
-            "failure": 0,
-            "nonexistent": 1,
-            "success": 2,
-        }
-        return statuses[status]
+        raise ValueError(f"Mapper {name} not found.")
 
-    def contact_type(contact: str) -> int:
-        contacts = {
-            "cellular": 0,
-            "telephone": 1,
-        }
-        return contacts[contact]
 
-    def result_status(status: str) -> int:
-        statuses = {
-            "no": 0,
-            "yes": 1,
-        }
-        return statuses[status]
+class JobMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the job attribute.
+    """
+    __name__ = "job"
+    __data__ = {
+        "admin.": 0,
+        "blue-collar": 1,
+        "entrepreneur": 2,
+        "housemaid": 3,
+        "management": 4,
+        "retired": 5,
+        "self-employed": 6,
+        "services": 7,
+        "student": 8,
+        "technician": 9,
+        "unemployed": 10,
+    }
+
+
+class MaritalStatusMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the marital status attribute.
+    """
+    __name__ = "marital_status"
+    __data__ = {
+        "divorced": 0,
+        "married": 1,
+        "single": 2,
+    }
+
+
+class EducationLevelMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the education level attribute.
+    """
+    __name__ = "education_level"
+    __data__ = {
+        "basic.4y": 0,
+        "basic.6y": 1,
+        "basic.9y": 2,
+        "high.school": 3,
+        "illiterate": 4,
+        "professional.course": 5,
+        "university.degree": 6,
+    }
+
+
+class DefaultStatusMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the default status attribute.
+    """
+    __name__ = "default_status"
+    __data__ = {
+        "no": 0,
+        "yes": 1,
+    }
+
+
+class HousingLoanMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the housing loan attribute.
+    """
+    __name__ = "housing_loan"
+    __data__ = {
+        "no": 0,
+        "yes": 1,
+    }
+
+
+class LoanStatusMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the loan status attribute.
+    """
+    __name__ = "loan_status"
+    __data__ = {
+        "no": 0,
+        "yes": 1,
+    }
+
+
+class MonthMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the month attribute.
+    """
+    __name__ = "month"
+    __data__ = {
+        "jan": 0,
+        "feb": 1,
+        "mar": 2,
+        "apr": 3,
+        "may": 4,
+        "jun": 5,
+        "jul": 6,
+        "aug": 7,
+        "sep": 8,
+        "oct": 9,
+        "nov": 10,
+        "dec": 11,
+    }
+
+
+class DayOfWeekMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the day of the week attribute.
+    """
+    __name__ = "day_of_week"
+    __data__ = {
+        "mon": 0,
+        "tue": 1,
+        "wed": 2,
+        "thu": 3,
+        "fri": 4,
+    }
+
+
+class PoutcomeStatusMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the poutcome status attribute.
+    """
+    __name__ = "poutcome_status"
+    __data__ = {
+        "failure": 0,
+        "nonexistent": 1,
+        "success": 2,
+    }
+
+
+class ContactTypeMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the contact type attribute.
+    """
+    __name__ = "contact_type"
+    __data__ = {
+        "cellular": 0,
+        "telephone": 1,
+    }
+
+
+class ResultStatusMapper(BaseMapper):
+    """
+    A class that provides mapping functions for the result status attribute.
+    """
+    __name__ = "result_status"
+    __data__ = {
+        "no": 0,
+        "yes": 1,
+    }
