@@ -2,4 +2,4 @@
 .vscode
 Pipfile.lock
 requirements.txt
-
+src/__pycache__/*

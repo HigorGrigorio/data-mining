@@ -1,179 +1,15 @@
+from io import StringIO
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from mappers import Mapper
-
+import json
+from mappers import Mapper as mp
 import normalization as norm
 
 CORRELATION_MATRIX_SIZE = 20
-
-
-def index_job(job: str) -> int:
-    jobs = {
-        "admin.": 0,
-        "blue-collar": 1,
-        "entrepreneur": 2,
-        "housemaid": 3,
-        "management": 4,
-        "retired": 5,
-        "self-employed": 6,
-        "services": 7,
-        "student": 8,
-        "technician": 9,
-        "unemployed": 10,
-        "unknown": 11,
-    }
-    return jobs[job]
-
-
-def marital_status(status: str) -> int:
-    statuses = {
-        "divorced": 0,
-        "married": 1,
-        "single": 2,
-        "unknown": 3,
-    }
-    return statuses[status]
-
-
-def education_level(level: str) -> int:
-    ed_level = {
-        "basic.4y": 0,
-        "basic.6y": 1,
-        "basic.9y": 2,
-        "high.school": 3,
-        "illiterate": 4,
-        "professional.course": 5,
-        "university.degree": 6,
-        "unknown": 7,
-    }
-
-    return ed_level[level]
-
-
-def default_status(status: str) -> int:
-    statuses = {
-        "no": 0,
-        "yes": 1,
-        "unknown": 2,
-    }
-    return statuses[status]
-
-
-def housing_loan(status: str) -> int:
-    statuses = {
-        "no": 0,
-        "yes": 1,
-        "unknown": 2,
-    }
-    return statuses[status]
-
-
-def loan_status(status: str) -> int:
-    statuses = {
-        "no": 0,
-        "yes": 1,
-        "unknown": 2,
-    }
-    return statuses[status]
-
-
-def month_index(month: str) -> int:
-    months = {
-        "jan": 0,
-        "feb": 1,
-        "mar": 2,
-        "apr": 3,
-        "may": 4,
-        "jun": 5,
-        "jul": 6,
-        "aug": 7,
-        "sep": 8,
-        "oct": 9,
-        "nov": 10,
-        "dec": 11,
-    }
-    return months[month]
-
-
-def day_of_week_index(day: str) -> int:
-    days = {
-        "mon": 0,
-        "tue": 1,
-        "wed": 2,
-        "thu": 3,
-        "fri": 4,
-    }
-    return days[day]
-
-
-def poutcome_status(status: str) -> int:
-    statuses = {
-        "failure": 0,
-        "nonexistent": 1,
-        "success": 2,
-    }
-    return statuses[status]
-
-
-def contact_type(contact: str) -> int:
-    contacts = {
-        "cellular": 0,
-        "telephone": 1,
-    }
-    return contacts[contact]
-
-
-def result_status(status: str) -> int:
-    statuses = {
-        "no": 0,
-        "yes": 1,
-    }
-    return statuses[status]
-
-
-# function data load
-def load_data(
-    file_path: str,
-    sep: str = ";",
-    header: int = 0,
-    index_col: bool = False,
-    na_values: str = "unknown",
-    usecols: list = None,
-) -> pd.DataFrame:
-    return pd.read_csv(
-        file_path,
-        sep=sep,
-        header=header,
-        index_col=index_col,
-        na_values=np.nan,
-        usecols=usecols,
-        converters={
-            "y": lambda x: result_status(x),
-            "job": lambda x: index_job(x) if x != na_values else np.nan,
-            "marital": lambda x: marital_status(x) if x != na_values else np.nan,
-            "education": lambda x: education_level(x) if x != na_values else np.nan,
-            "default": lambda x: default_status(x) if x != na_values else np.nan,
-            "housing": lambda x: housing_loan(x) if x != na_values else np.nan,
-            "loan": lambda x: loan_status(x) if x != na_values else np.nan,
-            "month": lambda x: month_index(x),
-            "day_of_week": lambda x: day_of_week_index(x),
-            "contact": lambda x: contact_type(x),
-            "poutcome": lambda x: poutcome_status(x),
-        },
-    )
-
-
-def data_summary(data: pd.DataFrame) -> None:
-    print(f"Data examples:\n{data.head(10)}")
-    # print(f"Data info:\n{data.info()}")
-    print(f"Data desc:\n{data.describe()}")
-    print(f"Data shape:\n{data.shape}")
-    # print(f"Data columns:\n{data.columns}")
-    print(f"Data missing values:\n{data.isnull().sum()}")
 
 
 def data_preprocessing(data: pd.DataFrame):
@@ -186,17 +22,18 @@ def correlation_matrix(data: pd.DataFrame):
     print(f"Correlation matrix:\n{corr_matrix}")
     return corr_matrix
 
+
 def plot_correlation_matrix(corr_matrix: pd.DataFrame):
     """
     Plot correlation matrix with heatmap
     """
     plt.figure(figsize=(CORRELATION_MATRIX_SIZE, CORRELATION_MATRIX_SIZE))
-    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+    sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f")
     plt.title("Correlation Matrix Heatmap")
     plt.show()
 
 
-def show_information_data_frame(data: pd.DataFrame, correlation_matrix: bool = False):
+def show_information_data_frame(data: pd.DataFrame, correl_matrix: bool = False):
     """
     Show information about the data frame
     """
@@ -207,19 +44,32 @@ def show_information_data_frame(data: pd.DataFrame, correlation_matrix: bool = F
     print(f"Data columns:\n{data.columns}")
     print(f"Data missing values:\n{data.isnull().sum()}")
 
-    if correlation_matrix:
+    if correl_matrix:
         mrx = correlation_matrix(data)
         plot_correlation_matrix(mrx)
 
 
-INPUT_FILE = "./data/bank-additional/bank-additional/bank-additional-full.csv"
+INPUT_FILE = "./src/data/bank-additional/bank-additional/bank-additional-full.csv"
 NA_VALUE = "unknown"
 
 
 def main():
+    """
+    This is the main function that performs the analysis on the data.
+
+    It loads the entry columns from data/entry.json, reads the data from a CSV file,
+    performs data preprocessing, normalization, and displays information about the data.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
+
     # load the entry columns from data/entry.json
-    json_decoder = json.JSONDecoder()
-    entry = json_decoder.decode(open("data/entry.json").read())
+    io = StringIO(open("./src/data/entry.json", "r").read())
+    entry = json.load(io)
 
     # the columns to be used in the analysis
     names = entry["names"]
@@ -231,25 +81,26 @@ def main():
     # and it should be a list with only one element
     target = entry["target"]
 
+    # load the data from the file
     df = pd.read_csv(
         INPUT_FILE,  # the path to the data file
-        names=names,  # the columns to be used in the analysis
         header=0,  # the header of the file
         index_col=False,  # the index column
         na_values=NA_VALUE,  # the missing values
         sep=";",  # the separator of the file
         usecols=names,  # the columns to be used in the analysis
         converters={
-            "job": lambda x: index_job(x) if x != NA_VALUE else np.nan,
-            "marital": lambda x: marital_status(x) if x != NA_VALUE else np.nan,
-            "education": lambda x: education_level(x) if x != NA_VALUE else np.nan,
-            "default": lambda x: default_status(x) if x != NA_VALUE else np.nan,
-            "housing": lambda x: housing_loan(x) if x != NA_VALUE else np.nan,
-            "loan": lambda x: loan_status(x) if x != NA_VALUE else np.nan,
-            "month": lambda x: month_index(x),
-            "day_of_week": lambda x: day_of_week_index(x),
-            "contact": lambda x: contact_type(x),
-            "poutcome": lambda x: poutcome_status(x),
+            "job": lambda x: mp.index_job(x) if x != NA_VALUE else np.nan,
+            "marital": lambda x: mp.marital_status(x) if x != NA_VALUE else np.nan,
+            "education": lambda x: mp.education_level(x) if x != NA_VALUE else np.nan,
+            "default": lambda x: mp.default_status(x) if x != NA_VALUE else np.nan,
+            "housing": lambda x: mp.housing_loan(x) if x != NA_VALUE else np.nan,
+            "loan": lambda x: mp.loan_status(x) if x != NA_VALUE else np.nan,
+            "month": lambda x: mp.month_index(x),
+            "day_of_week": lambda x: mp.day_of_week_index(x),
+            "contact": lambda x: mp.contact_type(x),
+            "poutcome": lambda x: mp.poutcome_status(x),
+            "y": lambda x: mp.result_status(x),
         },
     )
 
@@ -264,18 +115,16 @@ def main():
     # using normalized columns to create a new dataframe
     normalized_df = pd.DataFrame(x_score, columns=features)
     normalized_df = pd.concat(
-        [normalized_df, df[target]],
-        axis=1  # axis = 0 for rows, axis = 1 for columns
+        [normalized_df, df[target]], axis=1  # axis = 0 for rows, axis = 1 for columns
     )
 
-    show_information_data_frame(
-        normalized_df,
-        correlation_matrix=True
-    )
+    show_information_data_frame(normalized_df, correl_matrix=True)
 
     exit()
 
-    data_path = __file__.replace("main.py", "data/bank-additional/bank-additional/bank-additional-full.csv")
+    data_path = __file__.replace(
+        "main.py", "data/bank-additional/bank-additional/bank-additional-full.csv"
+    )
     data = load_data(
         data_path,
         usecols=names,
@@ -287,6 +136,7 @@ def main():
     mrx = correlation_matrix(data)
 
     plot_correlation_matrix(mrx)
+
 
 if __name__ == "__main__":
     main()
