@@ -42,5 +42,18 @@
     "euribor3m",
     "nr.employed"
   ],
+  "categorical": [
+    "job",
+    "marital",
+    "education",
+    "default",
+    "housing",
+    "loan",
+    "contact",
+    "month",
+    "day_of_week",
+    "poutcome",
+    "y"
+  ],
   "target": "y"
 }

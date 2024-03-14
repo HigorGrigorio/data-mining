@@ -1,15 +1,13 @@
+import json
 from io import StringIO
-import pandas as pd
-import numpy as np
+
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
-import json
-
 from sklearn.decomposition import PCA
-from mappers import BaseMapper
+
 import normalization as norm
+from mappers import BaseMapper
 
 CORRELATION_MATRIX_SIZE = 20
 
@@ -112,8 +110,12 @@ def col_dda(df: pd.DataFrame, col: str, target: str, graph: str):
         raise ValueError("Invalid graph type")
 
 
-INPUT_FILE = "./src/data/bank-additional/bank-additional/bank-additional-full.csv"
+INPUT_FILE = "./data/bank-additional/bank-additional/bank-additional-full.csv"
 NA_VALUE = "unknown"
+
+
+def _make_map_adapter(column: str):
+    return BaseMapper.get_mapper(column).map
 
 
 def main():
@@ -144,6 +146,9 @@ def main():
     # and it should be a list with only one element
     target = entry["target"]
 
+    # the categorical columns are the columns that can be mapped to integers
+    categorical = entry["categorical"]
+
     # load the data from the file
     df = pd.read_csv(
         INPUT_FILE,  # the path to the data file
@@ -152,9 +157,7 @@ def main():
         na_values=NA_VALUE,  # the missing values
         sep=";",  # the separator of the file
         usecols=names,  # the columns to be used in the analysis
-        converters={
-            ["job", "marital", "education", "default", "housing", "loan", "contact", "month", "day_of_week", "poutcome"]: BaseMapper.get_mapper("job").map_list,
-        },
+        converters={col: _make_map_adapter(col) for col in categorical},  # the converters
     )
 
     # perform data preprocessing - drop missing values

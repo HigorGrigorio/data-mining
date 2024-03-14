@@ -5,6 +5,8 @@
 
 from functools import lru_cache
 
+import numpy as np
+
 
 class BaseMapper:
     """
@@ -22,12 +24,22 @@ class BaseMapper:
         if cls.__data__ is None:
             raise NotImplementedError("The __data__ attribute must be implemented.")
 
+        if value == 'unknown':
+            return np.nan
+        elif value not in cls.__data__.keys():
+            raise ValueError(f"Value {value} not found in {cls.__column__} mapper.")
+
         return cls.__data__[value]
 
     @classmethod
     def revert(cls, value):
         if cls.__data__ is None:
             raise NotImplementedError("The __data__ attribute must be implemented.")
+
+        if np.isnan(value):
+            return 'unknown'
+        elif value not in cls.__data__.values():
+            raise ValueError(f"Value {value} not found in {cls.__column__} mapper.")
 
         return list(cls.__data__.keys())[list(cls.__data__.values()).index(value)]
 
@@ -205,7 +217,7 @@ class ResultStatusMapper(BaseMapper):
     A class that provides mapping functions for the result status attribute.
     """
 
-    __column__ = "result_status"
+    __column__ = "y"
     __data__ = {
         "no": 0,
         "yes": 1,
