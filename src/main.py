@@ -131,7 +131,7 @@ def main():
     """
 
     # load the entry columns from data/entry.json
-    io = StringIO(open("./src/data/entry.json", "r").read())
+    io = StringIO(open("./data/entry.json", "r").read())
     entry = json.load(io)
 
     # the columns to be used in the analysis
