@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import json
+
+from sklearn.decomposition import PCA
 from mappers import Mapper as mp
 import normalization as norm
 
@@ -47,6 +49,30 @@ def show_information_data_frame(data: pd.DataFrame, correl_matrix: bool = False)
     if correl_matrix:
         mrx = correlation_matrix(data)
         plot_correlation_matrix(mrx)
+
+
+def VisualizePcaProjection(df, targetColumn):
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_xlabel("Principal Component 1", fontsize=15)
+    ax.set_ylabel("Principal Component 2", fontsize=15)
+    ax.set_title("2 component PCA", fontsize=20)
+    targets = [
+        0,
+        1,
+    ]
+    colors = ["r", "g"]
+    for target, color in zip(targets, colors):
+        indicesToKeep = df[targetColumn] == target
+        ax.scatter(
+            df.loc[indicesToKeep, "principal component 1"],
+            df.loc[indicesToKeep, "principal component 2"],
+            c=color,
+            s=50,
+        )
+    ax.legend(targets)
+    ax.grid()
+    plt.show()
 
 
 INPUT_FILE = "./src/data/bank-additional/bank-additional/bank-additional-full.csv"
@@ -104,6 +130,9 @@ def main():
         },
     )
 
+    # perform data preprocessing - drop missing values
+    df = data_preprocessing(df)
+
     # getting the features to be used in the analysis
     x = df.loc[:, features].values
 
@@ -120,22 +149,19 @@ def main():
 
     show_information_data_frame(normalized_df, correl_matrix=True)
 
-    exit()
+    # PCA projection
+    pca = PCA()
+    principalComponents = pca.fit_transform(x_score) # fit the data and transform it
+    print("Explained variance per component:")
+    print(pca.explained_variance_ratio_.tolist())
+    print("\n\n")
 
-    data_path = __file__.replace(
-        "main.py", "data/bank-additional/bank-additional/bank-additional-full.csv"
+    principalDf = pd.DataFrame(
+        data=principalComponents[:, 0:2],
+        columns=["principal component 1", "principal component 2"],
     )
-    data = load_data(
-        data_path,
-        usecols=names,
-    )
-
-    data = data_preprocessing(data)
-    data_summary(data)
-
-    mrx = correlation_matrix(data)
-
-    plot_correlation_matrix(mrx)
+    finalDf = pd.concat([principalDf, df[[target]]], axis=1)
+    VisualizePcaProjection(finalDf, "y")
 
 
 if __name__ == "__main__":
