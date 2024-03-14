@@ -8,7 +8,7 @@ import seaborn as sns
 import json
 
 from sklearn.decomposition import PCA
-from mappers import Mapper as mp
+from mappers import BaseMapper
 import normalization as norm
 
 CORRELATION_MATRIX_SIZE = 20
@@ -75,6 +75,43 @@ def VisualizePcaProjection(df, targetColumn):
     plt.show()
 
 
+def pca(x_score, df: pd.DataFrame, target):
+    pca = PCA()
+    principalComponents = pca.fit_transform(x_score)  # fit the data and transform it
+    print("Explained variance per component:")
+    print(pca.explained_variance_ratio_.tolist())
+    print("\n\n")
+
+    principalDf = pd.DataFrame(
+        data=principalComponents[:, 0:2],
+        columns=["principal component 1", "principal component 2"],
+    )
+    finalDf = pd.concat([principalDf, df[[target]]], axis=1)
+    VisualizePcaProjection(finalDf, "y")
+
+
+def col_dda(df: pd.DataFrame, col: str, target: str, graph: str):
+    """
+    This function receives a dataframe, a column name, a target column name and a graph type.
+    It plots the distribution of the column values and the target values.
+    """
+    if graph == "hist":
+
+        df[col].hist()
+        plt.title(f"Distribution of {col}")
+        plt.xlabel(col)
+        plt.ylabel("Frequency")
+        plt.show()
+    elif graph == "box":
+        df.boxplot(column=col, by=target)
+        plt.title(f"Distribution of {col} by {target}")
+        plt.xlabel(target)
+        plt.ylabel(col)
+        plt.show()
+    else:
+        raise ValueError("Invalid graph type")
+
+
 INPUT_FILE = "./src/data/bank-additional/bank-additional/bank-additional-full.csv"
 NA_VALUE = "unknown"
 
@@ -116,17 +153,7 @@ def main():
         sep=";",  # the separator of the file
         usecols=names,  # the columns to be used in the analysis
         converters={
-            "job": lambda x: mp.index_job(x) if x != NA_VALUE else np.nan,
-            "marital": lambda x: mp.marital_status(x) if x != NA_VALUE else np.nan,
-            "education": lambda x: mp.education_level(x) if x != NA_VALUE else np.nan,
-            "default": lambda x: mp.default_status(x) if x != NA_VALUE else np.nan,
-            "housing": lambda x: mp.housing_loan(x) if x != NA_VALUE else np.nan,
-            "loan": lambda x: mp.loan_status(x) if x != NA_VALUE else np.nan,
-            "month": lambda x: mp.month_index(x),
-            "day_of_week": lambda x: mp.day_of_week_index(x),
-            "contact": lambda x: mp.contact_type(x),
-            "poutcome": lambda x: mp.poutcome_status(x),
-            "y": lambda x: mp.result_status(x),
+            ["job", "marital", "education", "default", "housing", "loan", "contact", "month", "day_of_week", "poutcome"]: BaseMapper.get_mapper("job").map_list,
         },
     )
 
@@ -147,21 +174,13 @@ def main():
         [normalized_df, df[target]], axis=1  # axis = 0 for rows, axis = 1 for columns
     )
 
-    show_information_data_frame(normalized_df, correl_matrix=True)
+    # show_information_data_frame(normalized_df, correl_matrix=True)
 
     # PCA projection
-    pca = PCA()
-    principalComponents = pca.fit_transform(x_score) # fit the data and transform it
-    print("Explained variance per component:")
-    print(pca.explained_variance_ratio_.tolist())
-    print("\n\n")
+    # pca(x_score, df, target)
 
-    principalDf = pd.DataFrame(
-        data=principalComponents[:, 0:2],
-        columns=["principal component 1", "principal component 2"],
-    )
-    finalDf = pd.concat([principalDf, df[[target]]], axis=1)
-    VisualizePcaProjection(finalDf, "y")
+    # Plot the dda of cols
+    col_dda(df, "marital", "y", "hist")
 
 
 if __name__ == "__main__":

@@ -2,10 +2,15 @@
 # (C) 2024 Andre Conde (andre.conde100@gmail.com)  (MIT License)
 # -----------------------------------------------------------------------------
 
+
+from functools import lru_cache
+
+
 class BaseMapper:
     """
     Base class for mappers.
     """
+
     __name__ = None
     __data__ = None
 
@@ -35,6 +40,7 @@ class BaseMapper:
         return [cls.revert(value) for value in values]
 
     @staticmethod
+    @lru_cache
     def get_mapper(name: str):
         classes = BaseMapper.__subclasses__()
 
@@ -49,6 +55,7 @@ class JobMapper(BaseMapper):
     """
     A class that provides mapping functions for the job attribute.
     """
+
     __name__ = "job"
     __data__ = {
         "admin.": 0,
@@ -69,7 +76,8 @@ class MaritalStatusMapper(BaseMapper):
     """
     A class that provides mapping functions for the marital status attribute.
     """
-    __name__ = "marital_status"
+
+    __name__ = "marital"
     __data__ = {
         "divorced": 0,
         "married": 1,
@@ -81,7 +89,8 @@ class EducationLevelMapper(BaseMapper):
     """
     A class that provides mapping functions for the education level attribute.
     """
-    __name__ = "education_level"
+
+    __name__ = "education"
     __data__ = {
         "basic.4y": 0,
         "basic.6y": 1,
@@ -97,7 +106,8 @@ class DefaultStatusMapper(BaseMapper):
     """
     A class that provides mapping functions for the default status attribute.
     """
-    __name__ = "default_status"
+
+    __name__ = "default"
     __data__ = {
         "no": 0,
         "yes": 1,
@@ -108,7 +118,8 @@ class HousingLoanMapper(BaseMapper):
     """
     A class that provides mapping functions for the housing loan attribute.
     """
-    __name__ = "housing_loan"
+
+    __name__ = "housing"
     __data__ = {
         "no": 0,
         "yes": 1,
@@ -119,7 +130,8 @@ class LoanStatusMapper(BaseMapper):
     """
     A class that provides mapping functions for the loan status attribute.
     """
-    __name__ = "loan_status"
+
+    __name__ = "loan"
     __data__ = {
         "no": 0,
         "yes": 1,
@@ -130,6 +142,7 @@ class MonthMapper(BaseMapper):
     """
     A class that provides mapping functions for the month attribute.
     """
+
     __name__ = "month"
     __data__ = {
         "jan": 0,
@@ -151,6 +164,7 @@ class DayOfWeekMapper(BaseMapper):
     """
     A class that provides mapping functions for the day of the week attribute.
     """
+
     __name__ = "day_of_week"
     __data__ = {
         "mon": 0,
@@ -165,7 +179,8 @@ class PoutcomeStatusMapper(BaseMapper):
     """
     A class that provides mapping functions for the poutcome status attribute.
     """
-    __name__ = "poutcome_status"
+
+    __name__ = "poutcome"
     __data__ = {
         "failure": 0,
         "nonexistent": 1,
@@ -177,7 +192,8 @@ class ContactTypeMapper(BaseMapper):
     """
     A class that provides mapping functions for the contact type attribute.
     """
-    __name__ = "contact_type"
+
+    __name__ = "contact"
     __data__ = {
         "cellular": 0,
         "telephone": 1,
@@ -188,6 +204,7 @@ class ResultStatusMapper(BaseMapper):
     """
     A class that provides mapping functions for the result status attribute.
     """
+
     __name__ = "result_status"
     __data__ = {
         "no": 0,
