@@ -1,9 +1,11 @@
+from enum import auto
 import json
 from io import StringIO
 from math import ceil
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from pyparsing import line
 import seaborn as sns
 from sklearn.decomposition import PCA
 
@@ -93,6 +95,7 @@ def VisualizePcaProjection(finalDf, targetColumn):
     ax.grid()
     plt.show()
 
+
 def pca(x_score, df: pd.DataFrame, target):
     pca = PCA()
     principalComponents = pca.fit_transform(x_score)  # fit the data and transform it
@@ -114,7 +117,7 @@ def _is_categorical(col: str) -> bool:
     if col in entry["categorical"]:
         return True
     return False
-    
+
 
 def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **kwargs):
     """
@@ -142,27 +145,20 @@ def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **k
             df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
             df[target] = df_copy
             if kwargs.get("bins"):
-                df.groupby(pd.cut(df[col], bins=kwargs.get("bins")))[target].value_counts(sort=False).unstack().plot(kind="bar", stacked=False)
+                df.groupby(pd.cut(df[col], bins=kwargs.get("bins")),observed=False)[
+                    target
+                ].value_counts(sort=False).unstack().plot(kind="bar", stacked=False)
             else:
-                df.groupby(col)[target].value_counts(sort=False).unstack().plot(kind="bar", stacked=False)
+                df.groupby(col, observed=False)[target].value_counts(sort=False).unstack().plot(
+                    kind="bar", stacked=False
+                )
             plt.title(f"Bar plot of {col} by {target}")
             plt.xlabel(col)
             plt.ylabel("Frequency")
             plt.show()
         case "box":
             # Plot the boxplot of the column values by the target values
-            if _is_categorical(col) :
-                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
-                df[col] = df_copy
-            df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
-            df[target] = df_copy
-            
-            if kwargs.get("bins"):
-                df.boxplot(column=col, by=pd.cut(df[target], bins=kwargs.get("bins")))
-            else:
-                df.boxplot(column=col, by=target)
-            plt.title(f"Box plot of {col} by {target}")
-            plt.xlabel(target)
+            df.boxplot(column=col, by=target,)
             plt.ylabel(col)
             plt.show()
         case "pie":
@@ -172,17 +168,14 @@ def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **k
                 df[col] = df_copy
             df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
             df[target] = df_copy
-            df.groupby(col)[target].value_counts().unstack().plot(kind="pie", subplots=True, figsize=(30, 30))
+            df.groupby(col)[target].value_counts().unstack().plot(
+                kind="pie", subplots=True, figsize=(30, 30), autopct="%1.1f%%"
+            )
             plt.title(f"Pie plot of {col} by {target}")
             plt.show()
         case "density":
             # Plot the density plot of the column values by the target values
-            if _is_categorical(col) :
-                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
-                df[col] = df_copy
-                df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
-                df[target] = df_copy
-            df.groupby(col)[target].plot(kind="kde")
+            df.groupby(col)[target].plot(kind="density")
             plt.title(f"Density plot of {col} by {target}")
             plt.xlabel(col)
             plt.ylabel("Density")
@@ -192,8 +185,8 @@ def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **k
             if _is_categorical(col):
                 df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
                 df[col] = df_copy
-                df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
-                df[target] = df_copy
+            df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
+            df[target] = df_copy
             df.plot.scatter(x=col, y=target)
             plt.title(f"Scatter plot of {col} by {target}")
             plt.xlabel(col)
@@ -201,15 +194,17 @@ def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **k
             plt.show()
         case "kde":
             # Plot the kernel density estimation plot of the column values by the target values
-            if _is_categorical(col):
-                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
-                df[col] = df_copy
-                df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
-                df[target] = df_copy
             df.groupby(col)[target].plot(kind="kde")
             plt.title(f"KDE plot of {col} by {target}")
             plt.xlabel(col)
             plt.ylabel("Density")
+            plt.show()
+        case "line":
+            # Plot the line plot of the column values by the target values
+            df.groupby(col, sort=False)[target].plot(kind="line")
+            plt.title(f"Line plot of {target} by {col}")
+            plt.xlabel(target)
+            plt.ylabel(col)
             plt.show()
         case _:  # default case
             raise ValueError("Invalid graph type")
@@ -221,6 +216,7 @@ NA_VALUE = "unknown"
 
 def _make_map_adapter(column: str):
     return BaseMapper.get_mapper(column).map
+
 
 def main():
     """
@@ -291,11 +287,10 @@ def main():
     # pca(x_score, df, target)
 
     # Plot the dda of cols
-    # col_dda(df, "age", "y", "bar", bins=ceil(df["age"].max() / 10))
-    # col_dda(df, "job", "y", "pie")
-    col_dda(df, "education", "y", "bar")
-    # col_dda(df, "marital", "y", "pie")
-    # col_dda(df, "marital", "y", "box")
+    col_dda(df.copy(), "age", "y", "bar", bins=ceil(df["age"].max() / 10))
+    col_dda(df.copy(), "job", "y", "pie")
+    col_dda(df.copy(), "education", "y", "bar")
+    col_dda(df.copy(), "marital", "y", "pie")
 
 
 if __name__ == "__main__":
