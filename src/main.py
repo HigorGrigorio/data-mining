@@ -93,7 +93,6 @@ def VisualizePcaProjection(finalDf, targetColumn):
     ax.grid()
     plt.show()
 
-
 def pca(x_score, df: pd.DataFrame, target):
     pca = PCA()
     principalComponents = pca.fit_transform(x_score)  # fit the data and transform it
@@ -109,59 +108,108 @@ def pca(x_score, df: pd.DataFrame, target):
     VisualizePcaProjection(finalDf, "y")
 
 
+def _is_categorical(col: str) -> bool:
+    io = StringIO(open("./src/data/entry.json", "r").read())
+    entry = json.load(io)
+    if col in entry["categorical"]:
+        return True
+    return False
+    
+
 def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **kwargs):
     """
-    This function receives a dataframe, a column name, a target column name and a graph type.
-    It plots the distribution of the column values and the target values.
+    Plot various types of graphs based on the column values and the target values.
+
+    Parameters:
+        df (pd.DataFrame): The DataFrame containing the data.
+        col (str | list[str]): The column(s) to be plotted.
+        target (str): The target column.
+        graph (str): The type of graph to be plotted. Options: "bar", "box", "pie", "density", "scatter", "kde".
+        **kwargs: Additional keyword arguments for customizing the plots.
+
+    Raises:
+        ValueError: If an invalid graph type is provided.
+
+    Returns:
+        None
     """
     match graph:
-        case "hist":
-            if df[col].dtype == "object":
+        case "bar":
+            # Plot the relative frequency of the column values by the target values
+            if _is_categorical(col):
                 df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
                 df[col] = df_copy
-
-            df[col].hist()
-            plt.title(f"Distribution of {col}")
+            df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
+            df[target] = df_copy
+            if kwargs.get("bins"):
+                df.groupby(pd.cut(df[col], bins=kwargs.get("bins")))[target].value_counts(sort=False).unstack().plot(kind="bar", stacked=False)
+            else:
+                df.groupby(col)[target].value_counts(sort=False).unstack().plot(kind="bar", stacked=False)
+            plt.title(f"Bar plot of {col} by {target}")
             plt.xlabel(col)
             plt.ylabel("Frequency")
             plt.show()
         case "box":
-            df.boxplot(column=col, by=target)
-            plt.title(f"Distribution of {col} by {target}")
+            # Plot the boxplot of the column values by the target values
+            if _is_categorical(col) :
+                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
+                df[col] = df_copy
+            df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
+            df[target] = df_copy
+            
+            if kwargs.get("bins"):
+                df.boxplot(column=col, by=pd.cut(df[target], bins=kwargs.get("bins")))
+            else:
+                df.boxplot(column=col, by=target)
+            plt.title(f"Box plot of {col} by {target}")
             plt.xlabel(target)
             plt.ylabel(col)
             plt.show()
-        case "bar":
-            if kwargs.get("bins"):
-                df[col].value_counts(bins=kwargs.get("bins"), sort=False).plot(
-                    kind="bar", rot=0
-                )
-            else:
-                df[col].value_counts().plot(kind="bar")
-            plt.title(f"Bar plot of {col}")
-            plt.xlabel(col)
-            plt.ylabel("Frequency")
-            plt.show()
         case "pie":
-            df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
-            df[col] = df_copy
-            df[col].value_counts().plot(kind="pie", autopct="%1.1f%%")
-            plt.title(f"Pie plot of {col}")
-            plt.ylabel(col)
+            # Plot the pie chart of the column values by the target values
+            if _is_categorical(col):
+                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
+                df[col] = df_copy
+            df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
+            df[target] = df_copy
+            df.groupby(col)[target].value_counts().unstack().plot(kind="pie", subplots=True, figsize=(30, 30))
+            plt.title(f"Pie plot of {col} by {target}")
             plt.show()
         case "density":
-            df[col].value_counts(sort=False).plot(kind="density")
-            plt.title(f"Count plot of {col}")
+            # Plot the density plot of the column values by the target values
+            if _is_categorical(col) :
+                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
+                df[col] = df_copy
+                df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
+                df[target] = df_copy
+            df.groupby(col)[target].plot(kind="kde")
+            plt.title(f"Density plot of {col} by {target}")
             plt.xlabel(col)
-            plt.ylabel("Frequency")
+            plt.ylabel("Density")
             plt.show()
         case "scatter":
-            df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
-            df[col] = df_copy
-            plt.scatter(df[col], df[target])
-            plt.title(f"Scatter plot of {col} and {target}")
+            # Plot the scatter plot of the column values by the target values
+            if _is_categorical(col):
+                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
+                df[col] = df_copy
+                df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
+                df[target] = df_copy
+            df.plot.scatter(x=col, y=target)
+            plt.title(f"Scatter plot of {col} by {target}")
             plt.xlabel(col)
             plt.ylabel(target)
+            plt.show()
+        case "kde":
+            # Plot the kernel density estimation plot of the column values by the target values
+            if _is_categorical(col):
+                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
+                df[col] = df_copy
+                df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
+                df[target] = df_copy
+            df.groupby(col)[target].plot(kind="kde")
+            plt.title(f"KDE plot of {col} by {target}")
+            plt.xlabel(col)
+            plt.ylabel("Density")
             plt.show()
         case _:  # default case
             raise ValueError("Invalid graph type")
@@ -173,7 +221,6 @@ NA_VALUE = "unknown"
 
 def _make_map_adapter(column: str):
     return BaseMapper.get_mapper(column).map
-
 
 def main():
     """
@@ -246,9 +293,9 @@ def main():
     # Plot the dda of cols
     # col_dda(df, "age", "y", "bar", bins=ceil(df["age"].max() / 10))
     # col_dda(df, "job", "y", "pie")
-    # col_dda(df, "education", "y", "pie")
+    col_dda(df, "education", "y", "bar")
     # col_dda(df, "marital", "y", "pie")
-    col_dda(df, "marital", "y", "box")
+    # col_dda(df, "marital", "y", "box")
 
 
 if __name__ == "__main__":
