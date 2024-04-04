@@ -13,7 +13,7 @@ CORRELATION_MATRIX_SIZE = 20
 
 
 def data_preprocessing(data: pd.DataFrame):
-    data = data.dropna()  # drop missing values
+    data = data.dropna()
     return data
 
 
@@ -94,9 +94,8 @@ def col_dda(df: pd.DataFrame, col: str, target: str, graph: str):
     It plots the distribution of the column values and the target values.
     """
     if graph == "hist":
-        df_copy = df.copy()
-        df_copy[col] = _make_revert_adapter(col)(df_copy[col])
-        df_copy.hist()
+
+        df[col].hist()
         plt.title(f"Distribution of {col}")
         plt.xlabel(col)
         plt.ylabel("Frequency")
@@ -117,10 +116,6 @@ NA_VALUE = "unknown"
 
 def _make_map_adapter(column: str):
     return BaseMapper.get_mapper(column).map
-
-
-def _make_revert_adapter(column: str):
-    return BaseMapper.get_mapper(column).revert
 
 
 def main():
@@ -176,7 +171,6 @@ def main():
 
     # fit x using z score normalization
     x_score = norm.normalize(x, "sklearn-z-score")
-
     # using normalized columns to create a new dataframe
     normalized_df = pd.DataFrame(x_score, columns=features)
     normalized_df = pd.concat(
