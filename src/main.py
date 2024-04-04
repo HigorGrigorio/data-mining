@@ -13,7 +13,7 @@ CORRELATION_MATRIX_SIZE = 20
 
 
 def data_preprocessing(data: pd.DataFrame):
-    data = data.dropna()
+    data = data.dropna() # drop missing values
     return data
 
 
