@@ -32,13 +32,13 @@ def data_preprocessing(data: pd.DataFrame, method: str):
     """
     match method:
         case "clean":
-            data = data.dropna()
+            data = data.dropna() # drop rows with missing values
         case "mean":
-            data = data.fillna(data.mean())
+            data = data.fillna(data.mean()) # fill missing values with the mean of the column
         case "mode":
-            data = data.fillna(data.mode().iloc[0])
+            data = data.fillna(data.mode().iloc[0]) # fill missing values with the mode of the column
         case "median":
-            data = data.fillna(data.median())
+            data = data.fillna(data.median()) # fill missing values with the median of the column
         case _:
             raise ValueError("Invalid method")
     return data
