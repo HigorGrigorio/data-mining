@@ -2,6 +2,7 @@ from enum import auto
 import json
 from io import StringIO
 from math import ceil
+from turtle import width
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -145,20 +146,51 @@ def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **k
             df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
             df[target] = df_copy
             if kwargs.get("bins"):
-                df.groupby(pd.cut(df[col], bins=kwargs.get("bins")),observed=False)[
+                df.groupby(pd.cut(df[col], bins=kwargs.get("bins")), observed=False)[
                     target
                 ].value_counts(sort=False).unstack().plot(kind="bar", stacked=False)
             else:
-                df.groupby(col, observed=False)[target].value_counts(sort=False).unstack().plot(
-                    kind="bar", stacked=False
-                )
+                df.groupby(col, observed=False)[target].value_counts(
+                    sort=False
+                ).unstack().plot(kind="bar", stacked=False)
             plt.title(f"Bar plot of {col} by {target}")
             plt.xlabel(col)
             plt.ylabel("Frequency")
             plt.show()
+        case "line-percentage":
+            # percentage of yes and no, for each category
+            if _is_categorical(col):
+                df_copy = BaseMapper.get_mapper(col).revert_list(df[col])
+                df[col] = df_copy
+            df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
+            df[target] = df_copy
+            if kwargs.get("bins"):
+                df = (
+                    df.groupby(
+                        pd.cut(df[col], bins=kwargs.get("bins")), observed=False
+                    )[target]
+                    .value_counts(sort=False)
+                    .unstack()
+                )
+            else:
+                df = (
+                    df.groupby(col, observed=False)[target]
+                    .value_counts(sort=False)
+                    .unstack()
+                )
+            df = df.div(df.sum(axis=1), axis=0) * 100
+            print(f"Percentage of yes and no for each category:\n{df}")
+            df.plot(kind="line", stacked=False, xticks=range(len(df.index)))
+            plt.title(f"Line plot of {col} by {target}")
+            plt.xlabel(col)
+            plt.ylabel("Percentage")
+            plt.show()
         case "box":
             # Plot the boxplot of the column values by the target values
-            df.boxplot(column=col, by=target,)
+            df.boxplot(
+                column=col,
+                by=target,
+            )
             plt.ylabel(col)
             plt.show()
         case "pie":
@@ -169,9 +201,12 @@ def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **k
             df_copy = BaseMapper.get_mapper(target).revert_list(df[target])
             df[target] = df_copy
             df.groupby(col)[target].value_counts().unstack().plot(
-                kind="pie", subplots=True, figsize=(30, 30), autopct="%1.1f%%"
+                kind="pie",
+                subplots=True,
+                figsize=(15, 15),
+                autopct="%1.1f%%",
+                title=f"Pie plot of {col} by {target}",
             )
-            plt.title(f"Pie plot of {col} by {target}")
             plt.show()
         case "density":
             # Plot the density plot of the column values by the target values
@@ -263,7 +298,7 @@ def main():
     )
 
     # perform data preprocessing
-    df = data_preprocessing(df, "mode")
+    df = data_preprocessing(df, "clean")
 
     # getting the features to be used in the analysis
     x = df.loc[:, features].values
@@ -281,16 +316,21 @@ def main():
 
     # show_information_data_frame(df, correl_matrix=False)
     # show_information_data_frame(normalized_df, correl_matrix=True)
-    show_information_data_frame(normalized_df, correl_matrix=False)
+    # show_information_data_frame(normalized_df, correl_matrix=False)
 
     # PCA projection
-    # pca(x_score, df, target)
+    # pca(x_score, normalized_df, target)
 
     # Plot the dda of cols
-    col_dda(df.copy(), "age", "y", "bar", bins=ceil(df["age"].max() / 10))
-    col_dda(df.copy(), "job", "y", "pie")
-    col_dda(df.copy(), "education", "y", "bar")
-    col_dda(df.copy(), "marital", "y", "pie")
+    # col_dda(df.copy(), "age", "y", "bar", bins=ceil(df["age"].max() / 10))
+    # col_dda(df.copy(), "age", "y", "line-percentage", bins=ceil(df["age"].max() / 10))
+    # col_dda(df.copy(), "job", "y", "pie")
+    # col_dda(df.copy(), "education", "y", "bar")
+    # col_dda(df.copy(), "education", "y", "line-percentage")
+    # col_dda(df.copy(), "marital", "y", "bar")
+    # col_dda(df.copy(), "marital", "y", "line-percentage")
+    col_dda(df.copy(), "loan", "y", "bar")
+    col_dda(df.copy(), "housing", "y", "bar")
 
 
 if __name__ == "__main__":
