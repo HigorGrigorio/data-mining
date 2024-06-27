@@ -1,15 +1,17 @@
-from enum import auto
 import json
 from io import StringIO
 from math import ceil
 from turtle import width
-
+import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from pyparsing import line
 import seaborn as sns
+from sklearn import preprocessing
 from sklearn.decomposition import PCA
-
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.model_selection import train_test_split
 import normalization as norm
 from mappers import BaseMapper
 
@@ -32,13 +34,19 @@ def data_preprocessing(data: pd.DataFrame, method: str):
     """
     match method:
         case "clean":
-            data = data.dropna() # drop rows with missing values
+            data = data.dropna()  # drop rows with missing values
         case "mean":
-            data = data.fillna(data.mean()) # fill missing values with the mean of the column
+            data = data.fillna(
+                data.mean()
+            )  # fill missing values with the mean of the column
         case "mode":
-            data = data.fillna(data.mode().iloc[0]) # fill missing values with the mode of the column
+            data = data.fillna(
+                data.mode().iloc[0]
+            )  # fill missing values with the mode of the column
         case "median":
-            data = data.fillna(data.median()) # fill missing values with the median of the column
+            data = data.fillna(
+                data.median()
+            )  # fill missing values with the median of the column
         case _:
             raise ValueError("Invalid method")
     return data
@@ -50,17 +58,24 @@ def correlation_matrix(data: pd.DataFrame):
     return corr_matrix
 
 
-def plot_correlation_matrix(corr_matrix: pd.DataFrame):
+def plot_correlation_matrix(
+    corr_matrix: pd.DataFrame,
+    size: tuple = (CORRELATION_MATRIX_SIZE, CORRELATION_MATRIX_SIZE),
+):
     """
     Plot correlation matrix with heatmap
     """
-    plt.figure(figsize=(CORRELATION_MATRIX_SIZE, CORRELATION_MATRIX_SIZE))
+    plt.figure(figsize=size)
     sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f")
     plt.title("Correlation Matrix Heatmap")
     plt.show()
 
 
-def show_information_data_frame(data: pd.DataFrame, correl_matrix: bool = False):
+def show_information_data_frame(
+    data: pd.DataFrame,
+    correl_matrix: bool = False,
+    size: tuple = (CORRELATION_MATRIX_SIZE, CORRELATION_MATRIX_SIZE),
+):
     """
     Show information about the data frame
     """
@@ -73,7 +88,7 @@ def show_information_data_frame(data: pd.DataFrame, correl_matrix: bool = False)
 
     if correl_matrix:
         mrx = correlation_matrix(data)
-        plot_correlation_matrix(mrx)
+        plot_correlation_matrix(mrx, size=size)
 
 
 def VisualizePcaProjection(finalDf, targetColumn):
@@ -97,6 +112,44 @@ def VisualizePcaProjection(finalDf, targetColumn):
     plt.show()
 
 
+def pca3d(x_score, df: pd.DataFrame, targetColumn):
+    pca = PCA()
+    principalComponents = pca.fit_transform(x_score)  # fit the data and transform it
+    print("Explained variance per component:")
+    print(pca.explained_variance_ratio_.tolist())
+    print("\n\n")
+
+    principalDf = pd.DataFrame(
+        data=principalComponents[:, 0:3],
+        columns=[
+            "principal component 1",
+            "principal component 2",
+            "principal component 3",
+        ],
+    )
+    finalDf = pd.concat([principalDf, df[[targetColumn]]], axis=1)
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection="3d")
+    ax.set_xlabel("Principal Component 1", fontsize=15)
+    ax.set_ylabel("Principal Component 2", fontsize=15)
+    ax.set_zlabel("Principal Component 3", fontsize=15)
+    ax.set_title("3 component PCA", fontsize=20)
+    targets = {0: "no", 1: "yes"}
+    colors = ["r", "g"]
+    for target, color in zip(targets, colors):
+        indicesToKeep = finalDf[targetColumn] == target
+        ax.scatter(
+            finalDf.loc[indicesToKeep, "principal component 1"],
+            finalDf.loc[indicesToKeep, "principal component 2"],
+            finalDf.loc[indicesToKeep, "principal component 3"],
+            c=color,
+            s=50,
+        )
+    ax.legend(targets.values())
+    ax.grid()
+    plt.show()
+
+
 def pca(x_score, df: pd.DataFrame, target):
     pca = PCA()
     principalComponents = pca.fit_transform(x_score)  # fit the data and transform it
@@ -109,7 +162,7 @@ def pca(x_score, df: pd.DataFrame, target):
         columns=["principal component 1", "principal component 2"],
     )
     finalDf = pd.concat([principalDf, df[[target]]], axis=1)
-    VisualizePcaProjection(finalDf, "y")
+    VisualizePcaProjection(finalDf, target)
 
 
 def _is_categorical(col: str) -> bool:
@@ -245,6 +298,76 @@ def col_dda(df: pd.DataFrame, col: str | list[str], target: str, graph: str, **k
             raise ValueError("Invalid graph type")
 
 
+def mix_cols(df: pd.DataFrame, col1: str, col2: str, target: str, plot: bool = True):
+    """
+    Mix two columns and plot the result
+
+    Parameters:
+        df (pd.DataFrame): The DataFrame containing the data.
+        col1 (str): The first column to be mixed.
+        col2 (str): The second column to be mixed.
+        target (str): The target column.
+
+    Returns:
+        None
+    """
+    # remove the target column
+    targ = df[target].values
+    df.drop([target], axis=1, inplace=True)
+
+    # mix the columns
+    df[str(col1 + "_" + col2)] = (df[col1] + df[col2]) / 2
+    df.drop([col1, col2], axis=1, inplace=True)
+
+    # add the target column back
+    df[target] = targ
+
+    # plot the mixed column
+    if plot:
+        show_information_data_frame(
+            df,
+            correl_matrix=True,
+            size=(CORRELATION_MATRIX_SIZE, CORRELATION_MATRIX_SIZE),
+        )
+    return df
+
+
+def k_means(df: pd.DataFrame, n_clusters: int, target: str = "y", features: list[str] = []):
+    """
+    Perform K-means clustering on the given DataFrame.
+
+    Parameters:
+        df (pd.DataFrame): The DataFrame containing the data.
+        n_clusters (int): The number of clusters to form.
+
+    Returns:
+        None
+    """
+
+    # if no features are provided, use all columns except the target column
+    if not features:
+        features = df.columns.tolist()
+        features.remove(target)
+    
+    # drop rows with missing values
+    df.dropna(inplace=True)
+
+    # create train and test data
+    x_train, x_test, y_train, y_test = train_test_split(df[features], df[target], test_size=0.5, random_state=0)
+
+    # normalize the data
+    x_train = preprocessing.normalize(x_train)
+    x_test = preprocessing.normalize(x_test)
+
+    # perform K-means clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+    kmeans.fit(x_train)
+
+    score = silhouette_score(x_test, kmeans.labels_, metric='euclidean')
+
+    return kmeans, score
+
+
 INPUT_FILE = "./src/data/bank-additional/bank-additional/bank-additional-full.csv"
 NA_VALUE = "unknown"
 
@@ -307,7 +430,7 @@ def main():
     y = df.loc[:, target].values
 
     # fit x using z score normalization
-    x_score = norm.normalize(x, "sklearn-z-score")
+    x_score = norm.normalize(x, "sklearn-min-max")
     # using normalized columns to create a new dataframe
     normalized_df = pd.DataFrame(x_score, columns=features)
     normalized_df = pd.concat(
@@ -319,19 +442,49 @@ def main():
     # show_information_data_frame(normalized_df, correl_matrix=False)
 
     # PCA projection
-    # pca(x_score, normalized_df, target)
+    # freq = normalized_df.copy()
+    # freq["freq"] = 1.0 / freq.groupby(target)[target].transform("count")
+    # pca(x_score, normalized_df.sample(n=4500, weights=freq.freq), target=target)
+    # pca3d(
+    #     x_score,
+    #     normalized_df.sample(n=4500, weights=freq.freq),
+    #     target,
+    # )
 
     # Plot the dda of cols
-    # col_dda(df.copy(), "age", "y", "bar", bins=ceil(df["age"].max() / 10))
-    # col_dda(df.copy(), "age", "y", "line-percentage", bins=ceil(df["age"].max() / 10))
+    # col_dda(normalized_df.sample(n=4500, weights=freq.freq).copy(), "age", "y", "bar", bins=5)
+    # col_dda(normalized_df.sample(n=4500, weights=freq.freq).copy(), "age", "y", "line-percentage", bins=5)
     # col_dda(df.copy(), "job", "y", "pie")
     # col_dda(df.copy(), "education", "y", "bar")
     # col_dda(df.copy(), "education", "y", "line-percentage")
     # col_dda(df.copy(), "marital", "y", "bar")
     # col_dda(df.copy(), "marital", "y", "line-percentage")
-    col_dda(df.copy(), "loan", "y", "bar")
-    col_dda(df.copy(), "housing", "y", "bar")
+    # col_dda(df.copy(), "loan", "y", "bar")
+    # col_dda(df.copy(), "housing", "y", "bar")
 
+    # Mix two columns
+    # mix_df = mix_cols(df.copy(), "emp.var.rate", "euribor3m", target, plot=False)
+    # mix_df = mix_cols(
+    # mix_df.copy(), "emp.var.rate_euribor3m", "nr.employed", target, plot=False
+    # )
+
+    # show_information_data_frame(mix_df, correl_matrix=True)
+
+    # K-means clustering
+    K = range(2, 10)
+    fits = []
+    scores = []
+    for k in K:
+        fit, score = k_means(df.copy(), k, target=target, features=features)
+        fits.append(fit)
+        scores.append(score)
+
+    plt.figure(figsize=(10, 5))
+    sns.lineplot(x=K, y=scores)
+    plt.xlabel("Number of clusters")
+    plt.ylabel("Silhouette score")
+    plt.title("Silhouette score vs Number of clusters")
+    plt.show()
 
 if __name__ == "__main__":
     main()
