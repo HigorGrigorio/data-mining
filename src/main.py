@@ -1,3 +1,4 @@
+import itertools
 import json
 from io import StringIO
 from math import ceil
@@ -10,8 +11,11 @@ import seaborn as sns
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import confusion_matrix, silhouette_score
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn import tree
 import normalization as norm
 from mappers import BaseMapper
 
@@ -332,7 +336,17 @@ def mix_cols(df: pd.DataFrame, col1: str, col2: str, target: str, plot: bool = T
     return df
 
 
-def k_means(df: pd.DataFrame, n_clusters: int, target: str = "y", features: list[str] = []):
+def balance(df: pd.DataFrame):
+    return (
+        df.groupby("y")
+        .apply(lambda x: x.sample(n=3500, replace=False))
+        .reset_index(drop=True)
+    )
+
+
+def k_means(
+    df: pd.DataFrame, n_clusters: int, target: str = "y", features: list[str] = []
+):
     """
     Perform K-means clustering on the given DataFrame.
 
@@ -348,24 +362,172 @@ def k_means(df: pd.DataFrame, n_clusters: int, target: str = "y", features: list
     if not features:
         features = df.columns.tolist()
         features.remove(target)
-    
+
     # drop rows with missing values
     df.dropna(inplace=True)
 
     # create train and test data
-    x_train, x_test, y_train, y_test = train_test_split(df[features], df[target], test_size=0.5, random_state=0)
+    x_train, x_test, y_train, y_test = train_test_split(
+        df[features], df[target], test_size=0.5, random_state=0
+    )
 
     # normalize the data
     x_train = preprocessing.normalize(x_train)
     x_test = preprocessing.normalize(x_test)
 
+    pca = PCA()
+    principalComponents = pca.fit_transform(x_train)
+    testComponents = pca.fit_transform(x_test)
+
     # perform K-means clustering
     kmeans = KMeans(n_clusters=n_clusters, random_state=0)
-    kmeans.fit(x_train)
+    kmeans.fit(principalComponents[:, 0:2])
 
-    score = silhouette_score(x_test, kmeans.labels_, metric='euclidean')
+    # calculate the silhouette score
+    score = silhouette_score(testComponents[:, 0:2], kmeans.labels_, metric="euclidean")
 
     return kmeans, score
+
+
+def visualize_decision_tree(clf, features):
+    plt.figure(figsize=(20, 20))
+    tree.plot_tree(clf, feature_names=features, class_names=["no", "yes"], filled=True)
+    plt.show()
+
+
+def decision_tree(x, y, visualize=False):
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.20, random_state=0, stratify=y
+    )
+
+    x_train = preprocessing.normalize(x_train, "max")
+    x_test = preprocessing.normalize(x_test, "max")
+    clf = DecisionTreeClassifier(random_state=0, max_leaf_nodes=5)
+    clf.fit(x_train, y_train)
+    y_pred = clf.predict(x_test)
+    print(f"Accuracy: {round(clf.score(x_test, y_test)*100,2)}%")
+
+    if visualize:
+        cm = confusion_matrix(y_test, y_pred)
+        plot_confusion_matrix(
+            cm, ["no", "yes"], normalize=False, title="Confusion matrix DT"
+        )
+        plot_confusion_matrix(
+            cm, ["no", "yes"], normalize=True, title="Confusion matrix DT Normalized"
+        )
+        visualize_decision_tree(clf, x)
+
+
+def euclidian_distance(row1, row2) -> float:
+    distance = 0.0
+    for i in range(len(row1) - 1):
+        distance += (row1[i] - row2[i]) ** 2
+    return distance ** (0.5)
+
+
+def get_neighbors(train, test_row, num_neighbors: int):
+    distances = []
+    for train_row in train:
+        dist = euclidian_distance(test_row, train_row)
+        distances.append((train_row, dist))
+    distances.sort(key=lambda tup: tup[1])
+    neighbors = []
+    for i in range(num_neighbors):
+        neighbors.append(distances[i][0])
+    return neighbors
+
+
+def knn_predict(train, test_row, num_neighbors):
+    neighbors = get_neighbors(train, test_row, num_neighbors)
+    output_values = [row[-1] for row in neighbors]
+    prediction = max(set(output_values), key=output_values.count)
+    return prediction
+
+
+def knn_manual(x, y, n: int):
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.20, random_state=0, stratify=y
+    )
+
+    x_train = preprocessing.normalize(x_train, "max")
+    x_test = preprocessing.normalize(x_test, "max")
+
+    train = np.concatenate((x_train, y_train.reshape(-1, 1)), axis=1)
+    test = np.concatenate((x_test, y_test.reshape(-1, 1)), axis=1)
+
+    predictions = []
+
+    for row in test:
+        output = knn_predict(train, row, n)
+        predictions.append(output)
+
+    cm = confusion_matrix(y_test, predictions)
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=False, title="Confusion matrix KNN"
+    )
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=True, title="Confusion matrix KNN Normalized"
+    )
+
+    return predictions
+
+
+def plot_confusion_matrix(
+    cm, classes, normalize=False, title="Confusion matrix", cmap=plt.cm.Blues
+):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    plt.figure()
+    plt.imshow(cm, interpolation="nearest", cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    if normalize:
+        cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print("Confusion matrix, without normalization")
+
+    print(cm)
+
+    thresh = cm.max() / 2.0
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(
+            j,
+            i,
+            cm[i, j],
+            horizontalalignment="center",
+            color="white" if cm[i, j] > thresh else "black",
+        )
+
+    plt.tight_layout()
+    plt.ylabel("True label")
+    plt.xlabel("Predicted label")
+
+
+def knn_sklearn(x, y):
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.20, random_state=0, stratify=y
+    )
+    knn = KNeighborsClassifier(n_neighbors=5)
+    knn.fit(x_train, y_train)
+
+    y_pred = knn.predict(x_test)
+    print(f"Accuracy: {round(knn.score(x_test, y_test)*100,2)}%")
+
+    cm = confusion_matrix(y_test, y_pred)
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=False, title="Confusion matrix KNN"
+    )
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=True, title="Confusion matrix KNN Normalized"
+    )
+    plt.show()
 
 
 INPUT_FILE = "./src/data/bank-additional/bank-additional/bank-additional-full.csv"
@@ -422,20 +584,24 @@ def main():
 
     # perform data preprocessing
     df = data_preprocessing(df, "clean")
+    df = pd.DataFrame(norm.normalize(df, "sklearn-min-max"), columns=features + [target])
+    df_balanced = balance(df.copy())
+    df_balanced.hist(bins=50, figsize=(20, 15))
+    plt.show()
 
     # getting the features to be used in the analysis
-    x = df.loc[:, features].values
+    x = df_balanced.loc[:, features].values
 
     # getting the target to be predicted
-    y = df.loc[:, target].values
+    y = df_balanced.loc[:, target].values
 
     # fit x using z score normalization
-    x_score = norm.normalize(x, "sklearn-min-max")
+    # x_score = norm.normalize(x, "sklearn-min-max")
     # using normalized columns to create a new dataframe
-    normalized_df = pd.DataFrame(x_score, columns=features)
-    normalized_df = pd.concat(
-        [normalized_df, df[target]], axis=1  # axis = 0 for rows, axis = 1 for columns
-    )
+    # normalized_df = pd.DataFrame(x_score, columns=features)
+    # normalized_df = pd.concat(
+    # [normalized_df, df[target]], axis=1  # axis = 0 for rows, axis = 1 for columns
+    # )
 
     # show_information_data_frame(df, correl_matrix=False)
     # show_information_data_frame(normalized_df, correl_matrix=True)
@@ -471,20 +637,30 @@ def main():
     # show_information_data_frame(mix_df, correl_matrix=True)
 
     # K-means clustering
-    K = range(2, 10)
-    fits = []
-    scores = []
-    for k in K:
-        fit, score = k_means(df.copy(), k, target=target, features=features)
-        fits.append(fit)
-        scores.append(score)
+    # K = range(2, 10)
+    # fits = []
+    # scores = []
+    # for k in K:
+    #     fit, score = k_means(df_balanced.copy(), k, target=target, features=features)
+    #     fits.append(fit)
+    #     scores.append(score)
 
-    plt.figure(figsize=(10, 5))
-    sns.lineplot(x=K, y=scores)
-    plt.xlabel("Number of clusters")
-    plt.ylabel("Silhouette score")
-    plt.title("Silhouette score vs Number of clusters")
-    plt.show()
+    # plt.figure(figsize=(10, 5))
+    # sns.lineplot(x=K, y=scores)
+    # plt.xlabel("Number of clusters")
+    # plt.ylabel("Silhouette score")
+    # plt.title("Silhouette score vs Number of clusters")
+    # plt.show()
+
+    # Decision tree
+    # decision_tree(x, y, True)
+
+    # KNN - Manual implementation
+    # predictions = knn_manual(x, y, 5)
+
+    # KNN - Sklearn implementation
+    # knn_sklearn(x, y)
+
 
 if __name__ == "__main__":
     main()
