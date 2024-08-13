@@ -1,23 +1,28 @@
 import itertools
 import json
 from io import StringIO
-from math import ceil
-from turtle import width
+from matplotlib.pylab import f
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from pyparsing import line
 import seaborn as sns
 from sklearn import preprocessing
+from sklearn.calibration import cross_val_predict
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.metrics import confusion_matrix, silhouette_score
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, f1_score, silhouette_score
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn import tree
+from sklearn.mixture import GaussianMixture
+from sklearn.svm import LinearSVC
+from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import ADASYN
 import normalization as norm
 from mappers import BaseMapper
+import tensorflow as tf
+import keras
 
 CORRELATION_MATRIX_SIZE = 20
 
@@ -336,12 +341,20 @@ def mix_cols(df: pd.DataFrame, col1: str, col2: str, target: str, plot: bool = T
     return df
 
 
-def balance(df: pd.DataFrame):
-    return (
-        df.groupby("y")
-        .apply(lambda x: x.sample(n=3500, replace=False))
-        .reset_index(drop=True)
-    )
+def balance(df: pd.DataFrame, method="smote") -> pd.DataFrame:
+    x = df[df.columns[:-1]]
+    y = df[df.columns[-1]]
+    match method:
+        case "smote":
+            smote = SMOTE(random_state=0)
+            x_resampled, y_resampled = smote.fit_resample(x, y)
+        case "adasyn":
+            adasyn = ADASYN(random_state=0)
+            x_resampled, y_resampled = adasyn.fit_resample(x, y)
+        case _:
+            raise ValueError("Invalid method")
+    df_resampled = pd.concat([x_resampled, y_resampled], axis=1)
+    return df_resampled
 
 
 def k_means(
@@ -363,30 +376,76 @@ def k_means(
         features = df.columns.tolist()
         features.remove(target)
 
-    # drop rows with missing values
-    df.dropna(inplace=True)
-
     # create train and test data
     x_train, x_test, y_train, y_test = train_test_split(
-        df[features], df[target], test_size=0.5, random_state=0
+        df[features], df[target], test_size=0.30, random_state=0, stratify=df[target]
     )
 
     # normalize the data
     x_train = preprocessing.normalize(x_train)
-    x_test = preprocessing.normalize(x_test)
 
     pca = PCA()
     principalComponents = pca.fit_transform(x_train)
-    testComponents = pca.fit_transform(x_test)
+    testComponents = pca.transform(x_test)
 
     # perform K-means clustering
     kmeans = KMeans(n_clusters=n_clusters, random_state=0)
     kmeans.fit(principalComponents[:, 0:2])
 
+    # predict the clusters
+    y_pred = kmeans.predict(testComponents[:, 0:2])
+    
     # calculate the silhouette score
-    score = silhouette_score(testComponents[:, 0:2], kmeans.labels_, metric="euclidean")
+    score = silhouette_score(testComponents[:, 0:2], y_pred, metric="euclidean")
+
+    print(f"accuracy: {round(score,2)*100}%")
+
+    cm = confusion_matrix(y_test, y_pred)
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=False, title="Confusion matrix K-means"
+    )
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=True, title="Confusion matrix K-means Normalized"
+    )
+    plt.show()
+
+    score_f1 = f1_score(y_test, y_pred)
+    print(f"F1 score: {round(score_f1,2)*100}%")
 
     return kmeans, score
+
+
+def gmm_sklearn(df: pd.DataFrame, features, target):
+    x_train, x_test, y_train, y_test = train_test_split(
+        df[features], df[target], test_size=0.30, random_state=0, stratify=df[target]
+    )
+
+    pca = PCA()
+    x_train = pca.fit_transform(x_train)
+    x_test = pca.transform(x_test)
+
+    gmm = GaussianMixture(
+        n_components=2, init_params="kmeans", random_state=0, max_iter=100
+    )
+    gmm.fit(x_train)
+    y_pred = gmm.predict(x_test)
+
+    accuracy = silhouette_score(x_test, y_pred, metric="euclidean")
+    print(f"Accuracy: {round(accuracy,2)*100}%")
+
+    cm = confusion_matrix(y_test, y_pred)
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=False, title="Confusion matrix GMM"
+    )
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=True, title="Confusion matrix GMM Normalized"
+    )
+    plt.show()
+
+    score_f1 = f1_score(y_test, y_pred)
+    print(f"F1 score: {round(number=score_f1,ndigits=2)*100}%")
+
+    return gmm
 
 
 def visualize_decision_tree(clf, features):
@@ -512,7 +571,7 @@ def plot_confusion_matrix(
 
 def knn_sklearn(x, y):
     x_train, x_test, y_train, y_test = train_test_split(
-        x, y, test_size=0.20, random_state=0, stratify=y
+        x, y, test_size=0.30, random_state=0, stratify=y
     )
     knn = KNeighborsClassifier(n_neighbors=5)
     knn.fit(x_train, y_train)
@@ -528,6 +587,190 @@ def knn_sklearn(x, y):
         cm, ["no", "yes"], normalize=True, title="Confusion matrix KNN Normalized"
     )
     plt.show()
+
+    score_f1 = f1_score(y_test, y_pred)
+    print(f"F1 score: {round(score_f1,2)*100}%")
+
+
+def knn_sklearn_cross_validation(x, y):
+    knn = KNeighborsClassifier(n_neighbors=5)
+
+    scores = cross_val_score(knn, x, y, cv=10)
+
+    y_pred = cross_val_predict(knn, x, y, cv=10)
+
+    cm = confusion_matrix(y, y_pred)
+
+    print(f"Accuracy: {round(scores.mean()*100,2)}%")
+
+    plot_confusion_matrix(
+        cm,
+        ["no", "yes"],
+        normalize=False,
+        title="Confusion matrix KNN Cross Validation",
+    )
+    plot_confusion_matrix(
+        cm,
+        ["no", "yes"],
+        normalize=True,
+        title="Confusion matrix KNN Cross Validation Normalized",
+    )
+    plt.show()
+
+    score_f1 = f1_score(y, y_pred)
+    print(f"F1 score: {round(score_f1,2)*100}%")
+
+
+def svm_sklearn(x, y):
+    svm = LinearSVC(random_state=0)
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.30, random_state=0, stratify=y
+    )
+    svm.fit(x_train, y_train)
+    y_pred = svm.predict(x_test)
+    print(f"Accuracy: {round(svm.score(x_test, y_test)*100,2)}%")
+
+    cm = confusion_matrix(y_test, y_pred)
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=False, title="Confusion matrix SVM"
+    )
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=True, title="Confusion matrix SVM Normalized"
+    )
+    plt.show()
+
+    score_f1 = f1_score(y_test, y_pred)
+    print(f"F1 score: {round(score_f1,2)*100}%")
+
+
+def svm_sklearn_cross_validation(x, y):
+    svm = LinearSVC(random_state=0)
+
+    scores = cross_val_score(svm, x, y, cv=10)
+
+    y_pred = cross_val_predict(svm, x, y, cv=10)
+
+    cm = confusion_matrix(y, y_pred)
+
+    print(f"Accuracy: {round(scores.mean()*100,2)}%")
+
+    plot_confusion_matrix(
+        cm,
+        ["no", "yes"],
+        normalize=False,
+        title="Confusion matrix SVM Cross Validation",
+    )
+    plot_confusion_matrix(
+        cm,
+        ["no", "yes"],
+        normalize=True,
+        title="Confusion matrix SVM Cross Validation Normalized",
+    )
+    plt.show()
+
+    score_f1 = f1_score(y, y_pred)
+    print(f"F1 score: {round(score_f1,2)*100}%")
+
+
+def df_to_dataset(df, target, shuffle=False, batch_size=32):
+    labels = df.pop(target)
+    ds = tf.data.Dataset.from_tensor_slices((df.values, labels.values))
+    if shuffle:
+        ds = ds.shuffle(buffer_size=len(df))
+    ds = ds.batch(batch_size)
+    return ds
+
+
+def create_model():
+    model = keras.Sequential(
+        [
+            keras.layers.InputLayer(shape=(19,)),
+            keras.layers.Dense(152, activation="relu", activity_regularizer="L2"),
+            # keras.layers.Dropout(0.25),
+            keras.layers.Dense(76, activation="relu", activity_regularizer="L2"),
+            # keras.layers.Dropout(0.25),
+            keras.layers.Dense(38, activation="relu", activity_regularizer="L2"),
+            # keras.layers.Dropout(0.25),
+            keras.layers.Dense(1, activation="sigmoid", activity_regularizer="L2"),
+        ]
+    )
+
+    model.summary()
+
+    return model
+
+
+@tf.function
+def IoU(y_true, y_pred):
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+
+    intersection = tf.reduce_sum(y_true * y_pred)
+    union = tf.reduce_sum(y_true) + tf.reduce_sum(y_pred)
+    iou = tf.math.divide_no_nan(intersection, union)
+    return iou
+
+
+@tf.function
+def IoU_loss(y_true, y_pred):
+    return 1.0 - IoU(y_true, y_pred)
+
+
+def train_model(df, target, batch_size=32, epochs=10):
+    model = create_model()
+    model.compile(
+        optimizer=keras.optimizers.Adam(learning_rate=0.0005),
+        loss=IoU_loss,
+        metrics=[
+            "accuracy",
+            "precision",
+            keras.metrics.BinaryIoU(target_class_ids=[0, 1], threshold=0.5),
+        ],
+    )
+    (
+        train,
+        val,
+    ) = train_test_split(df, test_size=0.2, random_state=0)
+    train, test = train_test_split(train, test_size=0.1, random_state=0)
+    train_ds = df_to_dataset(
+        train,
+        target=target,
+        batch_size=batch_size,
+    )
+    val_ds = df_to_dataset(
+        val,
+        target=target,
+        shuffle=False,
+        batch_size=batch_size,
+    )
+    test_ds = df_to_dataset(
+        test.copy(),
+        target=target,
+        shuffle=False,
+        batch_size=batch_size,
+    )
+
+    model.fit(train_ds, validation_data=val_ds, epochs=epochs)
+    acc = model.evaluate(test_ds)
+    print(f"acc {acc}")
+    y_pred = model.predict(test_ds)
+    y_pred = np.where(y_pred > 0.5, 1, 0)
+
+    print(f"Accuracy: {round(acc[1]*100,2)}%")
+
+    cm = confusion_matrix(test[target].values, y_pred)
+
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=False, title="Confusion matrix NN"
+    )
+    plot_confusion_matrix(
+        cm, ["no", "yes"], normalize=True, title="Confusion matrix NN Normalized"
+    )
+    plt.show()
+
+    score_f1 = f1_score(test[target].values, y_pred)
+
+    print(f"f1 score {round(score_f1,2)*100 }%")
 
 
 INPUT_FILE = "./src/data/bank-additional/bank-additional/bank-additional-full.csv"
@@ -584,10 +827,15 @@ def main():
 
     # perform data preprocessing
     df = data_preprocessing(df, "clean")
-    df = pd.DataFrame(norm.normalize(df, "sklearn-min-max"), columns=features + [target])
-    df_balanced = balance(df.copy())
-    df_balanced.hist(bins=50, figsize=(20, 15))
-    plt.show()
+    df = pd.DataFrame(
+        norm.normalize(df, "sklearn-min-max"), columns=features + [target]
+    )
+    df_balanced = balance(df.copy(), "smote")
+    # df_balanced_with_adasyn = balance(df.copy(), "adasyn")
+    # df_balanced_with_smote = balance(df.copy(), "smote")
+    # print(f"df {df.groupby(target).size()}")
+    # print(f"df balanced smote {df_balanced_with_smote.groupby(target).size()}")
+    # print(f"df balanced adasyn {df_balanced_with_adasyn.groupby(target).size()}")
 
     # getting the features to be used in the analysis
     x = df_balanced.loc[:, features].values
@@ -637,13 +885,15 @@ def main():
     # show_information_data_frame(mix_df, correl_matrix=True)
 
     # K-means clustering
+    k_means(df_balanced.copy(), 2, target=target, features=features)
     # K = range(2, 10)
+    # K = 2
     # fits = []
     # scores = []
     # for k in K:
-    #     fit, score = k_means(df_balanced.copy(), k, target=target, features=features)
-    #     fits.append(fit)
-    #     scores.append(score)
+    # fit, score = k_means(df_balanced.copy(), k, target=target, features=features)
+    # fits.append(fit)
+    # scores.append(score)
 
     # plt.figure(figsize=(10, 5))
     # sns.lineplot(x=K, y=scores)
@@ -651,6 +901,9 @@ def main():
     # plt.ylabel("Silhouette score")
     # plt.title("Silhouette score vs Number of clusters")
     # plt.show()
+
+    # GMM clustering
+    gmm_sklearn(df_balanced.copy(), features, target)
 
     # Decision tree
     # decision_tree(x, y, True)
@@ -660,6 +913,14 @@ def main():
 
     # KNN - Sklearn implementation
     # knn_sklearn(x, y)
+    # knn_sklearn_cross_validation(x, y)
+
+    # SVM
+    # svm_sklearn(x, y)
+    # svm_sklearn_cross_validation(x, y)
+
+    # Neural Network
+    # train_model(df_balanced.copy(), target, batch_size=32, epochs=10)
 
 
 if __name__ == "__main__":
